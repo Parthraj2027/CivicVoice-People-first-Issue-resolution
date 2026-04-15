@@ -9,10 +9,20 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ['citizen', 'admin', 'department'],
+      enum: ['citizen', 'department', 'ngo', 'volunteer', 'admin'],
       default: 'citizen',
     },
+    location: {
+      city: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+    },
+    karma: { type: Number, default: 0 },
+    badges: [{ type: String }],
+    isAnonymousReporter: { type: Boolean, default: false },
     department: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date, default: null },
   },
   { timestamps: true }
 );

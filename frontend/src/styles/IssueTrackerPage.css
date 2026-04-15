@@ -1,0 +1,98 @@
+.tracker-page {
+  max-width: 1150px;
+  margin: 0 auto;
+  padding: 1rem 1rem 5rem;
+  border-radius: 22px;
+  background: rgba(245, 251, 252, 0.9);
+  border: 1px solid rgba(236, 255, 253, 0.58);
+  box-shadow: 0 20px 44px rgba(8, 28, 39, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.tracker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.tracker-header h1 {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', 'Manrope', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  color: #102c37;
+}
+
+.tracker-header-actions,
+.tracker-header-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tracker-header-actions button {
+  border: 1px solid rgba(19, 34, 44, 0.12);
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  background: rgba(20, 95, 134, 0.1);
+  color: #145f86;
+  font-weight: 700;
+}
+
+.tracker-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 0.85rem;
+}
+
+.tracker-card {
+  border-radius: 16px;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(19, 34, 44, 0.1);
+  box-shadow: 0 12px 28px rgba(8, 28, 39, 0.09);
+}
+
+.tracker-card h2 { margin: 0 0 0.6rem; }
+.details-card p { color: #5f6f78; }
+.detail-row { margin-top: 0.35rem; }
+.detail-row strong { margin-right: 0.35rem; }
+
+.community-card button {
+  border: none;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  background: linear-gradient(135deg, #0d8c85, #145f86);
+  color: #fff;
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.witness-box {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.witness-box textarea {
+  border: 1px solid rgba(19, 34, 44, 0.16);
+  border-radius: 10px;
+  padding: 0.65rem;
+  font: inherit;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.community-card ul {
+  margin: 0.7rem 0 0;
+  padding-left: 1.1rem;
+  color: #5f6f78;
+}
+
+.tracker-error { color: #cb4e4e; margin-top: 0.75rem; }
+
+@media (max-width: 900px) {
+  .tracker-grid { grid-template-columns: 1fr; }
+}

@@ -1,32 +1,54 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { login, register } from './authSlice';
+import {
+  passwordRuleMessage,
+  validateLoginCredentials,
+  validateRegistrationCredentials,
+} from './formValidation';
 import { Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
 import '@/styles/LoginPage.css';
 
 const CitizenLoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { status, error } = useSelector((state) => state.auth);
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [formError, setFormError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const requestedPath = typeof location.state?.from === 'string' ? location.state.from : null;
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
+
     if (mode === 'login') {
+      const validationError = validateLoginCredentials({ email, password });
+      if (validationError) {
+        setFormError(validationError);
+        return;
+      }
+
       const result = await dispatch(
         login({ email, password, expectedRole: 'citizen' })
       ).unwrap().catch(() => null);
-      if (result) navigate('/citizen');
+      if (result) navigate(requestedPath || '/citizen', { replace: true });
     } else {
+      const validationError = validateRegistrationCredentials({ name, email, password });
+      if (validationError) {
+        setFormError(validationError);
+        return;
+      }
+
       const result = await dispatch(register({ name, email, password }))
         .unwrap()
         .catch(() => null);
-      if (result) navigate('/citizen');
+      if (result) navigate(requestedPath || '/citizen', { replace: true });
     }
   };
 
@@ -101,6 +123,7 @@ const CitizenLoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                minLength={8}
                 required
               />
               <button
@@ -112,7 +135,8 @@ const CitizenLoginPage = () => {
               </button>
             </div>
           </div>
-          {error && <p className="auth-error">{error}</p>}
+          {formError ? <p className="auth-error">{formError}</p> : null}
+          {!formError && error ? <p className="auth-error">{error}</p> : null}
           <button
             type="submit"
             className="primary-btn w-full"
@@ -131,6 +155,7 @@ const CitizenLoginPage = () => {
             Demo account: <code>citizen1@civicvoice.local</code> /{' '}
             <code>Citizen@123</code>
           </p>
+          {mode === 'register' ? <p>Password rules: {passwordRuleMessage}</p> : null}
         </div>
       </div>
     </div>

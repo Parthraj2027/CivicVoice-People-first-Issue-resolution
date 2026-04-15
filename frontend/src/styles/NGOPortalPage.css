@@ -1,0 +1,204 @@
+.ngo-portal-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(245, 251, 252, 0.9);
+  border: 1px solid rgba(236, 255, 253, 0.58);
+  box-shadow: 0 20px 44px rgba(8, 28, 39, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.ngo-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.ngo-hero h1 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: 'Plus Jakarta Sans', 'Manrope', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  color: #102c37;
+}
+
+.ngo-hero p {
+  margin: 0.35rem 0 0;
+  color: #4d616c;
+  font-weight: 500;
+}
+
+.ghost-cta {
+  border: 1px solid rgba(19, 34, 44, 0.12);
+  border-radius: 999px;
+  background: rgba(20, 95, 134, 0.1);
+  padding: 0.55rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #145f86;
+  font-weight: 700;
+}
+
+.ngo-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.ngo-overview-grid article {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(19, 34, 44, 0.1);
+  border-radius: 14px;
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.3rem;
+  color: #13222c;
+  box-shadow: 0 10px 24px rgba(8, 28, 39, 0.08);
+}
+
+.ngo-overview-grid strong {
+  font-size: 1.2rem;
+  color: #145f86;
+}
+
+.ngo-overview-grid span {
+  color: #5f6f78;
+  font-size: 0.9rem;
+}
+
+.ngo-cases-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  border: 1px solid rgba(19, 34, 44, 0.1);
+  padding: 1rem;
+  box-shadow: 0 12px 28px rgba(8, 28, 39, 0.09);
+}
+
+.ngo-cases-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.ngo-cases-header h2 {
+  margin: 0;
+}
+
+.ngo-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ngo-filters button {
+  border: 1px solid rgba(19, 34, 44, 0.1);
+  border-radius: 999px;
+  padding: 0.4rem 0.6rem;
+  background: rgba(20, 95, 134, 0.1);
+  color: #145f86;
+  font-weight: 700;
+}
+
+.ngo-filters button.active {
+  background: linear-gradient(135deg, #0d8c85, #145f86);
+  color: #fff;
+  border-color: transparent;
+}
+
+.ngo-cases-list {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ngo-case-item {
+  border: 1px solid rgba(19, 34, 44, 0.1);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.ngo-case-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.ngo-case-head h3 {
+  margin: 0;
+}
+
+.ngo-case-head p {
+  margin: 0.4rem 0 0;
+  color: #5f6f78;
+}
+
+.ngo-case-meta {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  color: #5f6f78;
+  font-size: 0.86rem;
+}
+
+.ngo-case-actions {
+  margin-top: 0.7rem;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.ngo-case-actions button {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0d8c85, #145f86);
+  color: #fff;
+  padding: 0.45rem 0.7rem;
+  font-weight: 700;
+}
+
+.ngo-case-actions button.danger {
+  background: linear-gradient(135deg, #cb4e4e, #ad3a3a);
+}
+
+.escalated-note {
+  margin: 0.6rem 0 0;
+  color: #B53B3B;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.ngo-error {
+  color: #cb4e4e;
+  margin: 0.3rem 0 0.7rem;
+}
+
+.ngo-success {
+  color: #0d8c85;
+  margin: 0.3rem 0 0.7rem;
+}
+
+.empty-note {
+  color: #5f6f78;
+}
+
+@media (max-width: 900px) {
+  .ngo-overview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ngo-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

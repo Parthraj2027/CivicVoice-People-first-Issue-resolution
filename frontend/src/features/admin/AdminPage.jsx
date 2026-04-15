@@ -96,6 +96,45 @@ const AdminPage = () => {
   const [showEvidenceModal, setShowEvidenceModal] = useState(false);
   const [evidenceUploadErrors, setEvidenceUploadErrors] = useState([]);
 
+  const unifiedStatuses = [
+    'pending',
+    'in_review',
+    'submitted',
+    'reviewing',
+    'assigned',
+    'in_progress',
+    'escalated',
+    'reopened',
+    'resolved',
+    'completed',
+    'closed',
+  ];
+
+  const getIssueCoordinates = (issue) => {
+    if (!issue) return null;
+    if (typeof issue?.geoLocation?.latitude === 'number' && typeof issue?.geoLocation?.longitude === 'number') {
+      return issue.geoLocation;
+    }
+
+    const lat = Number(issue?.location?.lat ?? issue?.location?.latitude);
+    const lng = Number(issue?.location?.lng ?? issue?.location?.longitude);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
+
+    return null;
+  };
+
+  const getIssueLocationText = (issue) => {
+    const location = issue?.location;
+    if (!location) return 'Location unavailable';
+    if (typeof location === 'string') return location;
+    if (typeof location === 'object') {
+      return [location.address, location.city, location.state, location.pincode].filter(Boolean).join(', ') || 'Location unavailable';
+    }
+    return 'Location unavailable';
+  };
+
   useEffect(() => {
     dispatch(fetchIssues());
     dispatch(fetchDepartments());
@@ -451,11 +490,11 @@ const AdminPage = () => {
   }, [items, filters]);
 
   const statusCounts = useMemo(() => {
-    const counts = { pending: 0, in_review: 0, completed: 0 };
+    const counts = { open: 0, in_progress: 0, resolved: 0 };
     filteredItems.forEach((i) => {
-      if (i.status === 'pending') counts.pending += 1;
-      else if (i.status === 'in_review') counts.in_review += 1;
-      else if (i.status === 'completed') counts.completed += 1;
+      if (['completed', 'resolved', 'closed'].includes(i.status)) counts.resolved += 1;
+      else if (['in_review', 'reviewing', 'assigned', 'in_progress', 'escalated'].includes(i.status)) counts.in_progress += 1;
+      else counts.open += 1;
     });
     return counts;
   }, [filteredItems]);
@@ -549,15 +588,15 @@ const AdminPage = () => {
             <div className="status-summary slide-in-left stagger-1">
           <div className="status-pill pending">
             <AlertTriangle size={16} />
-            Pending <span>{statusCounts.pending}</span>
+            Open <span>{statusCounts.open}</span>
           </div>
           <div className="status-pill in_review">
             <Clock size={16} />
-            In Review <span>{statusCounts.in_review}</span>
+            In Progress <span>{statusCounts.in_progress}</span>
           </div>
           <div className="status-pill completed">
             <CheckCircle size={16} />
-            Completed <span>{statusCounts.completed}</span>
+            Resolved <span>{statusCounts.resolved}</span>
           </div>
         </div>
 
@@ -612,10 +651,11 @@ const AdminPage = () => {
                     onChange={(e) => handleFilterChange('status', e.target.value)}
                   >
                     <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_review">In Review</option>
-                    <option value="completed">Completed</option>
-                    <option value="reopened">Reopened</option>
+                    {unifiedStatuses.map((statusOption) => (
+                      <option key={statusOption} value={statusOption}>
+                        {statusOption.replace('_', ' ')}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -675,10 +715,12 @@ const AdminPage = () => {
                   <h3>{issue.issueType}</h3>
                   <p className="issue-meta">
                     <MapPin size={14} />
-                    {issue.location}
+                    {getIssueLocationText(issue)}
                     <span>•</span>
                     <AlertTriangle size={14} />
                     Severity: <span className={`severity-badge severity-${issue.severity}`}>{issue.severity}</span>
+                    <span>•</span>
+                    <strong>{(issue.issueTrack || 'civic').toUpperCase()}</strong>
                   </p>
                   <p className="issue-meta">
                     <code>CV-{issue._id.slice(-6).toUpperCase()}</code>
@@ -689,20 +731,20 @@ const AdminPage = () => {
                 </span>
               </div>
               <p className="issue-summary">{issue.summary}</p>
-              {issue.geoLocation?.latitude && issue.geoLocation?.longitude && (
+              {getIssueCoordinates(issue) && (
                 <div className="issue-map-display">
                   <div className="map-header">
                     <span className="map-label">Pinned location</span>
                     <button 
                       className="map-expand-btn"
-                      onClick={() => setExpandedMap(issue.geoLocation)}
+                      onClick={() => setExpandedMap(getIssueCoordinates(issue))}
                       title="Expand map"
                     >
                       <Maximize2 size={16} />
                     </button>
                   </div>
                   <LocationPicker
-                    value={issue.geoLocation}
+                    value={getIssueCoordinates(issue)}
                     readOnly
                     showLocateButton={false}
                     label=""
@@ -866,9 +908,11 @@ const AdminPage = () => {
                   value={issue.status}
                   onChange={(e) => handleStatusChange(issue._id, e.target.value)}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="in_review">In Review</option>
-                  <option value="completed">Completed</option>
+                  {unifiedStatuses.map((statusOption) => (
+                    <option key={statusOption} value={statusOption}>
+                      {statusOption.replace('_', ' ')}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="button"
@@ -880,7 +924,7 @@ const AdminPage = () => {
                   Delete
                 </button>
               </div>
-              {issue.status === 'completed' && (
+              {(issue.status === 'completed' || issue.status === 'resolved') && (
                 <div className="reopen-section">
                   {!showReopenForm[issue._id] ? (
                     <button

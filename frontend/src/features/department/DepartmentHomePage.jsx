@@ -25,6 +25,45 @@ const DepartmentHomePage = () => {
     dateTo: '',
   });
 
+  const unifiedStatuses = [
+    'pending',
+    'in_review',
+    'submitted',
+    'reviewing',
+    'assigned',
+    'in_progress',
+    'escalated',
+    'reopened',
+    'resolved',
+    'completed',
+    'closed',
+  ];
+
+  const getIssueCoordinates = (issue) => {
+    if (!issue) return null;
+    if (typeof issue?.geoLocation?.latitude === 'number' && typeof issue?.geoLocation?.longitude === 'number') {
+      return issue.geoLocation;
+    }
+
+    const lat = Number(issue?.location?.lat ?? issue?.location?.latitude);
+    const lng = Number(issue?.location?.lng ?? issue?.location?.longitude);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return { latitude: lat, longitude: lng };
+    }
+
+    return null;
+  };
+
+  const getIssueLocationText = (issue) => {
+    const location = issue?.location;
+    if (!location) return 'Location unavailable';
+    if (typeof location === 'string') return location;
+    if (typeof location === 'object') {
+      return [location.address, location.city, location.state, location.pincode].filter(Boolean).join(', ') || 'Location unavailable';
+    }
+    return 'Location unavailable';
+  };
+
   useEffect(() => {
     dispatch(fetchDepartmentIssues());
   }, [dispatch]);
@@ -73,11 +112,11 @@ const DepartmentHomePage = () => {
   }, [departmentIssues, filters]);
 
   const statusCounts = useMemo(() => {
-    const counts = { pending: 0, in_review: 0, completed: 0 };
+    const counts = { open: 0, in_progress: 0, resolved: 0 };
     filteredIssues.forEach((i) => {
-      if (i.status === 'pending') counts.pending += 1;
-      else if (i.status === 'in_review') counts.in_review += 1;
-      else if (i.status === 'completed') counts.completed += 1;
+      if (['completed', 'resolved', 'closed'].includes(i.status)) counts.resolved += 1;
+      else if (['in_review', 'reviewing', 'assigned', 'in_progress', 'escalated'].includes(i.status)) counts.in_progress += 1;
+      else counts.open += 1;
     });
     return counts;
   }, [filteredIssues]);
@@ -153,9 +192,9 @@ const DepartmentHomePage = () => {
     }
 
     try {
-      // If there are files and status is being changed to completed, upload them first
+      // If there are files and status is being changed to a resolved state, upload them first
       let resolutionEvidence = [];
-      if (files && files.length > 0 && status === 'completed') {
+      if (files && files.length > 0 && (status === 'completed' || status === 'resolved')) {
         console.log('Uploading files:', files);
         const formData = new FormData();
         files.forEach((file) => {
@@ -242,15 +281,15 @@ const DepartmentHomePage = () => {
         <div className="status-summary dept-summary slide-in-left stagger-1">
           <div className="status-pill pending">
             <AlertTriangle size={16} />
-            Pending <span>{statusCounts.pending}</span>
+            Open <span>{statusCounts.open}</span>
           </div>
           <div className="status-pill in_review">
             <Clock size={16} />
-            In Review <span>{statusCounts.in_review}</span>
+            In Progress <span>{statusCounts.in_progress}</span>
           </div>
           <div className="status-pill completed">
             <Save size={16} />
-            Completed <span>{statusCounts.completed}</span>
+            Resolved <span>{statusCounts.resolved}</span>
           </div>
         </div>
 
@@ -290,10 +329,11 @@ const DepartmentHomePage = () => {
                     onChange={(e) => handleFilterChange('status', e.target.value)}
                   >
                     <option value="">All</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_review">In Review</option>
-                    <option value="completed">Completed</option>
-                    <option value="reopened">Reopened</option>
+                    {unifiedStatuses.map((statusOption) => (
+                      <option key={statusOption} value={statusOption}>
+                        {statusOption.replace('_', ' ')}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -356,10 +396,12 @@ const DepartmentHomePage = () => {
                   <h3>{issue.issueType}</h3>
                   <p className="dept-issue-meta">
                     <MapPin size={14} />
-                    {issue.location}
+                    {getIssueLocationText(issue)}
                     <span>•</span>
                     <AlertTriangle size={14} />
                     Severity: <span className={`severity-badge severity-${issue.severity}`}>{issue.severity}</span>
+                    <span>•</span>
+                    <strong>{(issue.issueTrack || 'civic').toUpperCase()}</strong>
                   </p>
                   <p className="dept-issue-meta">
                     <code>CV-{issue._id.slice(-6).toUpperCase()}</code>
@@ -370,20 +412,20 @@ const DepartmentHomePage = () => {
                 </span>
               </div>
               <p className="dept-issue-summary">{issue.summary}</p>
-              {issue.geoLocation?.latitude && issue.geoLocation?.longitude && (
+              {getIssueCoordinates(issue) && (
                 <div className="dept-issue-map">
                   <div className="map-header">
                     <span className="map-label">Pinned location</span>
                     <button 
                       className="map-expand-btn"
-                      onClick={() => setExpandedMap(issue.geoLocation)}
+                      onClick={() => setExpandedMap(getIssueCoordinates(issue))}
                       title="Expand map"
                     >
                       <Maximize2 size={16} />
                     </button>
                   </div>
                   <LocationPicker
-                    value={issue.geoLocation}
+                    value={getIssueCoordinates(issue)}
                     readOnly
                     showLocateButton={false}
                     label=""
@@ -475,13 +517,15 @@ const DepartmentHomePage = () => {
                   value={statusDrafts[issue._id] || issue.status}
                   onChange={(e) => handleStatusChange(issue._id, e.target.value)}
                 >
-                  <option value="pending">Pending</option>
-                  <option value="in_review">In Review</option>
-                  <option value="completed">Completed</option>
+                  {unifiedStatuses.map((statusOption) => (
+                    <option key={statusOption} value={statusOption}>
+                      {statusOption.replace('_', ' ')}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {(statusDrafts[issue._id] === 'completed' || issue.status === 'completed') && (
+              {(statusDrafts[issue._id] === 'completed' || statusDrafts[issue._id] === 'resolved' || issue.status === 'completed' || issue.status === 'resolved') && (
                 <div className="resolution-evidence-upload">
                   <label>
                     <FileText size={16} />

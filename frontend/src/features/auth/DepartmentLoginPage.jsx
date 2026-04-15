@@ -1,24 +1,37 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { login } from './authSlice';
+import { validateLoginCredentials } from './formValidation';
 import { Eye, EyeOff, Building2, Mail, Lock } from 'lucide-react';
 import '@/styles/LoginPage.css';
 
 const DepartmentLoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { status, error } = useSelector((state) => state.auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [formError, setFormError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const requestedPath = typeof location.state?.from === 'string' ? location.state.from : null;
+  const safeDepartmentPath = requestedPath && requestedPath.startsWith('/department') ? requestedPath : '/department';
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setFormError('');
+
+    const validationError = validateLoginCredentials({ email, password });
+    if (validationError) {
+      setFormError(validationError);
+      return;
+    }
+
     const result = await dispatch(
       login({ email, password, expectedRole: 'department' })
     ).unwrap().catch(() => null);
-    if (result) navigate('/department');
+    if (result) navigate(safeDepartmentPath, { replace: true });
   };
 
   return (
@@ -60,6 +73,7 @@ const DepartmentLoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
+                minLength={8}
                 required
               />
               <button
@@ -71,7 +85,8 @@ const DepartmentLoginPage = () => {
               </button>
             </div>
           </div>
-          {error && <p className="auth-error">{error}</p>}
+          {formError ? <p className="auth-error">{formError}</p> : null}
+          {!formError && error ? <p className="auth-error">{error}</p> : null}
           <button
             type="submit"
             className="primary-btn w-full"

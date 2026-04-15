@@ -2,6 +2,16 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,64}$/;
+const LOGIN_LOCK_THRESHOLD = 5;
+const LOGIN_LOCK_MS = 15 * 60 * 1000;
+
+const isStrongPassword = (password) => strongPasswordRegex.test(String(password || ''));
+
+const getPasswordRuleMessage = () =>
+  'Password must be 8-64 characters and include uppercase, lowercase, number, and special character.';
+
 const generateToken = (res, userId) => {
   const token = jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: '7d',
@@ -21,14 +31,28 @@ const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'Please provide all fields' });
   }
 
-  const existing = await User.findOne({ email });
+  if (String(name).trim().length < 2) {
+    return res.status(400).json({ message: 'Name must be at least 2 characters' });
+  }
+
+  if (!emailRegex.test(String(email).trim())) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
+  if (!isStrongPassword(password)) {
+    return res.status(400).json({ message: getPasswordRuleMessage() });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     return res.status(400).json({ message: 'User already exists' });
   }
 
   const user = await User.create({
     name,
-    email,
+    email: normalizedEmail,
     password,
     role: 'citizen',
   });
@@ -46,13 +70,32 @@ const loginUser = async (req, res) => {
     return res.status(400).json({ message: 'Please provide email and password' });
   }
 
-  const user = await User.findOne({ email }).populate('department', 'name');
+  if (!emailRegex.test(String(email).trim())) {
+    return res.status(400).json({ message: 'Please provide a valid email address' });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const user = await User.findOne({ email: normalizedEmail }).populate('department', 'name');
   if (!user) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
+  if (user.lockUntil && new Date(user.lockUntil).getTime() > Date.now()) {
+    const remainingMinutes = Math.ceil((new Date(user.lockUntil).getTime() - Date.now()) / 60000);
+    return res.status(423).json({
+      message: `Account temporarily locked due to failed attempts. Try again in ${remainingMinutes} minute(s).`,
+    });
+  }
+
   const match = await user.matchPassword(password);
   if (!match) {
+    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+    if (user.failedLoginAttempts >= LOGIN_LOCK_THRESHOLD) {
+      user.lockUntil = new Date(Date.now() + LOGIN_LOCK_MS);
+      user.failedLoginAttempts = 0;
+    }
+    await user.save();
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
@@ -60,6 +103,12 @@ const loginUser = async (req, res) => {
     return res.status(403).json({
       message: `This account is a ${user.role} account, not ${expectedRole}.`,
     });
+  }
+
+  if (user.failedLoginAttempts || user.lockUntil) {
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
   }
 
   generateToken(res, user._id);
@@ -97,6 +146,14 @@ const changePassword = async (req, res) => {
   const match = await user.matchPassword(currentPassword);
   if (!match) {
     return res.status(400).json({ message: 'Current password is incorrect' });
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    return res.status(400).json({ message: getPasswordRuleMessage() });
+  }
+
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: 'New password must be different from current password' });
   }
 
   user.password = newPassword;

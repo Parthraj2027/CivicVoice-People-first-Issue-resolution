@@ -1,0 +1,56 @@
+.jagruk-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1rem 5rem;
+}
+
+.jagruk-hero {
+  padding: 1.25rem 1.25rem 1.1rem;
+  border-radius: 22px;
+  margin-bottom: 1rem;
+}
+
+.jagruk-hero__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #0d8c85;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+}
+
+.jagruk-hero h1 {
+  margin: 0.5rem 0 0.35rem;
+  font-family: 'Plus Jakarta Sans', 'Manrope', system-ui, sans-serif;
+  letter-spacing: -0.03em;
+  color: #102c37;
+}
+
+.jagruk-hero p {
+  margin: 0;
+  color: #4d616c;
+}
+
+.jagruk-hero__chips {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.jagruk-hero__chips span {
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  background: rgba(20, 95, 134, 0.1);
+  color: #145f86;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.jagruk-embedded-panel {
+  min-height: 68vh;
+}

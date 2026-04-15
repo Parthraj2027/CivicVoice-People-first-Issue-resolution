@@ -3,6 +3,13 @@ const User = require('../models/User');
 const Department = require('../models/Department');
 const Issue = require('../models/Issue');
 const OpenAI = require('openai');
+const { analyzeIssueText } = require('../services/issueIntelligence');
+const { findBestNgoForIssue } = require('./socialIssueController');
+const {
+  deriveDepartmentForCivicCategory,
+  deriveDepartmentForSocialCategory,
+  formatIssueLocation,
+} = require('../utils/issueCatalog');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -145,67 +152,29 @@ const processGeneralInput = async (req, res) => {
       return res.status(400).json({ message: 'Text input is required' });
     }
 
-    // Use OpenAI to parse the unstructured text into structured complaint data
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an assistant that extracts structured complaint information from unstructured text (SMS, WhatsApp, emails, etc.). 
-Extract the following fields and return ONLY a valid JSON object (no markdown, no code blocks, no explanation):
-{
-  "issueType": "string (e.g., 'Water Supply Issue', 'Road Damage', 'Electricity Problem', 'Garbage Collection', 'Street Light', etc.)",
-  "location": "string (extract full address or location mentioned)",
-  "landmark": "string (extract nearby landmark if mentioned)",
-  "severity": "string (one of: 'low', 'medium', 'high', 'critical' - infer from urgency words like 'urgent', 'emergency', etc.)",
-  "description": "string (full detailed description of the issue, preserve all details)",
-  "summary": "string (brief 1-line summary, max 100 chars)",
-  "impact": "string (describe impact if mentioned, e.g., 'water wastage', 'traffic disruption', 'safety hazard')",
-  "recurrence": "string (one of: 'new', 'recurring', 'ongoing' - infer from text like 'since X days', 'happening again', etc.)",
-  "contactName": "string (extract name if mentioned)",
-  "contactPhone": "string (extract phone number if mentioned, format as-is)",
-  "contactEmail": "string (extract email if mentioned)",
-  "preferredContactMethod": "string (one of: 'phone', 'email', 'none' - infer from context or default to 'none')"
-}
-
-Rules:
-- If a field cannot be determined, set it to an empty string
-- For severity: 'critical' if words like 'emergency', 'danger', 'urgent'; 'high' if 'urgent', 'important'; 'medium' if moderately urgent; 'low' otherwise
-- For issueType: categorize based on keywords (water/pipe = Water Supply, road/pothole = Road Damage, etc.)
-- For recurrence: 'ongoing' if mentions duration, 'recurring' if mentions 'again' or 'repeated', otherwise 'new'
-- Preserve exact phone numbers and emails as found in text`,
-        },
-        {
-          role: 'user',
-          content: text,
-        },
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
-    });
-
-    const parsedData = JSON.parse(completion.choices[0].message.content);
-
-    // Validate and structure the data
+    const analysis = await analyzeIssueText({ text, track: 'mixed' });
     const structuredData = {
-      issueType: parsedData.issueType || 'General Complaint',
-      location: parsedData.location || 'Location not specified',
-      landmark: parsedData.landmark || '',
-      severity: ['low', 'medium', 'high', 'critical'].includes(parsedData.severity)
-        ? parsedData.severity
+      issueTrack: analysis.issueTrack,
+      issueType: analysis.issueTrack === 'social' ? analysis.socialCategory || 'social' : analysis.civicCategory || 'civic',
+      civicCategory: analysis.civicCategory || '',
+      socialCategory: analysis.socialCategory || '',
+      title: analysis.title || text.slice(0, 80),
+      location: analysis.location?.address || 'Location not specified',
+      landmark: '',
+      severity: ['low', 'medium', 'high', 'critical', 'emergency'].includes(analysis.severity)
+        ? analysis.severity
         : 'medium',
-      description: parsedData.description || text,
-      summary: parsedData.summary || text.substring(0, 100),
-      impact: parsedData.impact || '',
-      recurrence: ['new', 'recurring', 'ongoing'].includes(parsedData.recurrence)
-        ? parsedData.recurrence
-        : 'new',
-      contactName: parsedData.contactName || '',
-      contactPhone: parsedData.contactPhone || '',
-      contactEmail: parsedData.contactEmail || '',
-      preferredContactMethod: ['phone', 'email', 'none'].includes(parsedData.preferredContactMethod)
-        ? parsedData.preferredContactMethod
-        : 'none',
+      urgencyLevel: analysis.urgencyLevel || 'low',
+      description: analysis.description || text,
+      summary: analysis.summary || text.substring(0, 100),
+      impact: '',
+      recurrence: 'new',
+      contactName: '',
+      contactPhone: '',
+      contactEmail: '',
+      preferredContactMethod: 'none',
+      helplinesTriggered: analysis.helplinesTriggered || [],
+      locationDetails: analysis.location || {},
     };
 
     // Return the structured data without creating the issue yet
@@ -232,10 +201,31 @@ const createComplaintFromStructuredData = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Create the issue
+    const issueTrack = structuredData.issueTrack === 'social' || structuredData.socialCategory ? 'social' : 'civic';
+    const location = structuredData.locationDetails || structuredData.location || 'Location not specified';
+    let assignedNGO = null;
+    let assignedDepartment = null;
+
+    if (issueTrack === 'social') {
+      assignedNGO = await findBestNgoForIssue({
+        socialCategory: structuredData.socialCategory || 'environment',
+        location,
+      });
+      const departmentName = deriveDepartmentForSocialCategory(structuredData.socialCategory || 'environment');
+      assignedDepartment = await Department.findOne({ name: new RegExp(departmentName, 'i') });
+    } else {
+      const departmentName = deriveDepartmentForCivicCategory(structuredData.civicCategory || structuredData.issueType || 'other');
+      assignedDepartment = await Department.findOne({ name: new RegExp(departmentName, 'i') });
+    }
+
     const issueData = {
+      title: structuredData.title || structuredData.summary || structuredData.issueType,
       issueType: structuredData.issueType,
-      location: structuredData.location,
+      issueTrack,
+      civicCategory: issueTrack === 'civic' ? (structuredData.civicCategory || structuredData.issueType || 'other') : null,
+      socialCategory: issueTrack === 'social' ? (structuredData.socialCategory || null) : null,
+      location,
+      urgencyLevel: structuredData.urgencyLevel || structuredData.severity || 'low',
       landmark: structuredData.landmark || '',
       severity: structuredData.severity,
       description: structuredData.description,
@@ -246,8 +236,12 @@ const createComplaintFromStructuredData = async (req, res) => {
       contactPhone: structuredData.contactPhone || '',
       contactEmail: structuredData.contactEmail || '',
       preferredContactMethod: structuredData.preferredContactMethod || 'none',
-      status: 'pending',
+      status: issueTrack === 'social' ? (assignedNGO ? 'assigned' : 'submitted') : 'pending',
       createdBy: req.user?.userId || null,
+      reportedBy: req.user?.userId || null,
+      assignedNGO: assignedNGO?._id || null,
+      assignedDepartment: assignedDepartment?._id || null,
+      helplineTriggered: structuredData.helplinesTriggered || [],
     };
 
     const issue = await Issue.create(issueData);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet';
 import { Loader2, Search, X as CloseIcon } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -52,6 +52,8 @@ const LocationPicker = ({
   label = 'Drop a pin on the map',
   helperText = 'Search for a place, drop a pin, or use your current location to pin the issue.',
   className = '',
+  nearbyIssues = [],
+  onOpenIssue,
 }) => {
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState(null);
@@ -272,6 +274,13 @@ const LocationPicker = ({
   }, [value?.latitude, value?.longitude]);
 
   const hasLocation = typeof value?.latitude === 'number' && typeof value?.longitude === 'number';
+  const normalizedNearbyIssues = useMemo(
+    () =>
+      (Array.isArray(nearbyIssues) ? nearbyIssues : []).filter(
+        (item) => typeof item?.coordinates?.latitude === 'number' && typeof item?.coordinates?.longitude === 'number'
+      ),
+    [nearbyIssues]
+  );
 
   return (
     <div className={`location-picker ${className}`.trim()}>
@@ -383,6 +392,34 @@ const LocationPicker = ({
               icon={defaultMarkerIcon}
             />
           )}
+          {normalizedNearbyIssues.map((issue) => (
+            <Marker
+              key={issue._id || `${issue.coordinates.latitude}-${issue.coordinates.longitude}`}
+              position={[issue.coordinates.latitude, issue.coordinates.longitude]}
+              icon={defaultMarkerIcon}
+            >
+              <Popup>
+                <div className="location-nearby-popup">
+                  <strong>{issue.title || issue.issueType || 'Nearby issue'}</strong>
+                  <small>
+                    {(issue.issueTrack || 'issue').toUpperCase()} • {(issue.status || 'pending').replace('_', ' ')}
+                  </small>
+                  {typeof issue.distanceKm === 'number' ? (
+                    <small>{issue.distanceKm.toFixed(2)} km away</small>
+                  ) : null}
+                  {onOpenIssue ? (
+                    <button
+                      type="button"
+                      className="location-nearby-open"
+                      onClick={() => onOpenIssue(issue)}
+                    >
+                      Open issue
+                    </button>
+                  ) : null}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
           {!readOnly && onChange && <LocationEvents onSelect={handleSelect} />}
         </MapContainer>
       </div>

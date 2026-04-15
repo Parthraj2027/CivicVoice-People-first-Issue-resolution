@@ -46,4 +46,18 @@ const departmentOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly, departmentOnly };
+const ngoOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== 'ngo') {
+    return res.status(403).json({ message: 'NGO access only' });
+  }
+  next();
+};
+
+const volunteerOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== 'volunteer') {
+    return res.status(403).json({ message: 'Volunteer access only' });
+  }
+  next();
+};
+
+module.exports = { protect, adminOnly, departmentOnly, ngoOnly, volunteerOnly };

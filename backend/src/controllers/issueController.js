@@ -1,11 +1,15 @@
 
 const Issue = require('../models/Issue');
 const Department = require('../models/Department');
+const {
+  formatIssueLocation,
+  deriveDepartmentForCivicCategory,
+} = require('../utils/issueCatalog');
 
 const buildSummary = (issue) => {
   const parts = [];
   parts.push(
-    `Citizen reports a ${issue.severity.toLowerCase()} severity ${issue.issueType} at ${issue.location}${
+    `Citizen reports a ${issue.severity.toLowerCase()} severity ${issue.issueType} at ${formatIssueLocation(issue.location)}${
       issue.landmark ? ` (landmark: ${issue.landmark})` : ''
     }.`
   );
@@ -62,6 +66,8 @@ const createIssue = async (req, res) => {
 
   const normalizedSeverity = String(severity).toLowerCase();
   const normalizedRecurrence = recurrence ? String(recurrence).toLowerCase() : 'new';
+  const civicCategory = String(issueType).toLowerCase();
+  const issueLocation = typeof location === 'string' ? location : location;
 
   const parsedEvidenceUrls = Array.isArray(evidenceUrls)
     ? evidenceUrls
@@ -92,10 +98,14 @@ const createIssue = async (req, res) => {
   }
 
   const issue = new Issue({
+    title: issueType,
     issueType,
+    issueTrack: 'civic',
+    civicCategory,
     location,
     landmark,
     severity: normalizedSeverity,
+    urgencyLevel: normalizedSeverity === 'critical' ? 'emergency' : normalizedSeverity,
     description,
     impact,
     recurrence: normalizedRecurrence,
@@ -106,6 +116,8 @@ const createIssue = async (req, res) => {
     preferredContactMethod,
     status: 'pending',
     createdBy: req.user ? req.user._id : null,
+    reportedBy: req.user ? req.user._id : null,
+    isAnonymous: false,
     geoLocation: parsedGeoLocation,
   });
 
@@ -123,7 +135,10 @@ const createIssue = async (req, res) => {
 const getIssuesForAdmin = async (req, res) => {
   const issues = await Issue.find()
     .populate('forwardedTo', 'name')
+    .populate('assignedNGO', 'name logoUrl contact')
+    .populate('assignedDepartment', 'name description')
     .populate('createdBy', 'name email')
+    .populate('reportedBy', 'name email')
     .populate('departmentUpdates.addedBy', 'name email')
     .populate('departmentUpdates.department', 'name')
     .sort({ createdAt: -1 });
@@ -138,9 +153,14 @@ const getIssuesForDepartment = async (req, res) => {
       .json({ message: 'Department user and department assignment required' });
   }
 
-  const issues = await Issue.find({ forwardedTo: req.user.department })
+  const issues = await Issue.find({
+    $or: [{ forwardedTo: req.user.department }, { assignedDepartment: req.user.department }],
+  })
     .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact')
     .populate('createdBy', 'name email')
+    .populate('reportedBy', 'name email')
     .populate('departmentUpdates.addedBy', 'name email')
     .populate('departmentUpdates.department', 'name')
     .sort({ createdAt: -1 });
@@ -153,8 +173,12 @@ const getIssuesForCitizen = async (req, res) => {
     return res.status(403).json({ message: 'Citizen access only' });
   }
 
-  const issues = await Issue.find({ createdBy: req.user._id })
+  const issues = await Issue.find({
+    $or: [{ createdBy: req.user._id }, { reportedBy: req.user._id }],
+  })
     .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact')
     .populate('departmentUpdates.addedBy', 'name email')
     .populate('departmentUpdates.department', 'name')
     .sort({ createdAt: -1 });
@@ -172,11 +196,14 @@ const updateIssueStatus = async (req, res) => {
   }
 
   if (status) {
-    const allowed = ['pending', 'in_review', 'forwarded', 'completed'];
+    const allowed = ['pending', 'in_review', 'forwarded', 'completed', 'submitted', 'reviewing', 'assigned', 'in_progress', 'resolved', 'escalated', 'closed', 'reopened'];
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
     }
     issue.status = status;
+    if (status === 'resolved' || status === 'completed') {
+      issue.resolvedAt = new Date();
+    }
   }
 
   if (forwardedTo) {
@@ -185,6 +212,7 @@ const updateIssueStatus = async (req, res) => {
       return res.status(400).json({ message: 'Department not found' });
     }
     issue.forwardedTo = dept._id;
+    issue.assignedDepartment = dept._id;
     if (!status) {
       issue.status = 'pending';
     }
@@ -224,19 +252,35 @@ const addDepartmentUpdate = async (req, res) => {
   // Get the department ID - handle both populated object and direct ID
   const userDeptId = req.user.department._id ? req.user.department._id.toString() : req.user.department.toString();
   const issueForwardedToId = issue.forwardedTo ? issue.forwardedTo.toString() : null;
+  const issueAssignedDepartmentId = issue.assignedDepartment ? issue.assignedDepartment.toString() : null;
 
-  if (!issueForwardedToId || issueForwardedToId !== userDeptId) {
+  if ((!issueForwardedToId || issueForwardedToId !== userDeptId) && (!issueAssignedDepartmentId || issueAssignedDepartmentId !== userDeptId)) {
     return res
       .status(403)
       .json({ message: 'Issue is not assigned to your department' });
   }
 
   if (status) {
-    const allowed = ['pending', 'in_review', 'completed', 'reopened'];
+    const allowed = [
+      'pending',
+      'in_review',
+      'completed',
+      'reopened',
+      'submitted',
+      'reviewing',
+      'assigned',
+      'in_progress',
+      'resolved',
+      'escalated',
+      'closed',
+    ];
     if (!allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status value' });
     }
     issue.status = status;
+    if (status === 'resolved' || status === 'completed') {
+      issue.resolvedAt = new Date();
+    }
   }
 
   // Handle resolution evidence upload when marking as completed
@@ -264,7 +308,10 @@ const addDepartmentUpdate = async (req, res) => {
 
   const populated = await Issue.findById(saved._id)
     .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact')
     .populate('createdBy', 'name email')
+    .populate('reportedBy', 'name email')
     .populate('departmentUpdates.addedBy', 'name email')
     .populate('departmentUpdates.department', 'name');
 
@@ -287,7 +334,7 @@ const reopenIssue = async (req, res) => {
   }
 
   // Only allow reopening of completed issues
-  if (issue.status !== 'completed') {
+  if (!['completed', 'resolved'].includes(issue.status)) {
     return res
       .status(400)
       .json({ message: 'Only completed issues can be reopened' });
@@ -321,7 +368,10 @@ const reopenIssue = async (req, res) => {
 
   const populated = await Issue.findById(saved._id)
     .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact')
     .populate('createdBy', 'name email')
+    .populate('reportedBy', 'name email')
     .populate('departmentUpdates.addedBy', 'name email')
     .populate('departmentUpdates.department', 'name');
 
@@ -354,7 +404,7 @@ const rateIssue = async (req, res) => {
   }
 
   // Only allow rating completed issues
-  if (issue.status !== 'completed') {
+  if (!['completed', 'resolved'].includes(issue.status)) {
     return res.status(400).json({ message: 'Can only rate completed issues' });
   }
 
@@ -372,7 +422,10 @@ const rateIssue = async (req, res) => {
 
   const populated = await Issue.findById(issue._id)
     .populate('createdBy', 'name email')
-    .populate('forwardedTo', 'name');
+    .populate('reportedBy', 'name email')
+    .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact');
 
   return res.json(populated);
 };
@@ -380,7 +433,7 @@ const rateIssue = async (req, res) => {
 const getStats = async (req, res) => {
   try {
     // Count total issues resolved (completed status)
-    const resolvedCount = await Issue.countDocuments({ status: 'completed' });
+    const resolvedCount = await Issue.countDocuments({ status: { $in: ['completed', 'resolved'] } });
 
     // Count unique citizens (distinct createdBy users)
     const citizenCount = await Issue.distinct('createdBy').then(ids => ids.length);
@@ -406,7 +459,7 @@ const getRecentIssues = async (req, res) => {
     const recentIssues = await Issue.find()
       .sort({ createdAt: -1 })
       .limit(limit)
-      .select('issueType location severity status createdAt')
+      .select('title issueType issueTrack civicCategory socialCategory location severity status createdAt communityUpvotes')
       .lean();
 
     return res.json(recentIssues);
@@ -414,6 +467,23 @@ const getRecentIssues = async (req, res) => {
     console.error('Error fetching recent issues:', err);
     return res.status(500).json({ message: 'Failed to fetch recent issues' });
   }
+};
+
+const getIssueById = async (req, res) => {
+  const issue = await Issue.findById(req.params.id)
+    .populate('forwardedTo', 'name')
+    .populate('assignedDepartment', 'name description')
+    .populate('assignedNGO', 'name logoUrl contact')
+    .populate('createdBy', 'name email')
+    .populate('reportedBy', 'name email')
+    .populate('departmentUpdates.addedBy', 'name email')
+    .populate('departmentUpdates.department', 'name');
+
+  if (!issue) {
+    return res.status(404).json({ message: 'Issue not found' });
+  }
+
+  return res.json(issue);
 };
 
 const getDashboardStats = async (req, res) => {
@@ -539,4 +609,5 @@ module.exports = {
   getStats,
   getRecentIssues,
   getDashboardStats,
+  getIssueById,
 };

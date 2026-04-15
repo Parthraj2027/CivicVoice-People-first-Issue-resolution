@@ -1,426 +1,418 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  MessageSquare, 
-  MapPin, 
-  Clock, 
-  CheckCircle, 
-  Users, 
-  Building2,
+import {
   ArrowRight,
-  Shield,
-  Zap,
-  Heart,
-  AlertCircle,
-  Activity,
-  AlertTriangle,
-  Info,
-  X
+  ArrowUpRight,
+  BadgeCheck,
+  ChevronRight,
+  Clock3,
+  FileText,
+  Globe2,
+  HeartHandshake,
+  LayoutGrid,
+  ShieldCheck,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import api from '@/lib/apiClient';
 import '@/styles/LandingPage.css';
 
-const LandingPage = () => {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    activeCitizens: 0,
-    resolvedIssues: 0,
-    departments: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [recentIssues, setRecentIssues] = useState([]);
-  const [feedLoading, setFeedLoading] = useState(true);
-  const [alerts, setAlerts] = useState([]);
-  const [closedAlerts, setClosedAlerts] = useState([]);
+const AnimatedNumber = ({ target = 0, suffix = '' }) => {
+  const [value, setValue] = useState(0);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const duration = 1200;
+    const stepTime = 30;
+    const totalSteps = Math.ceil(duration / stepTime);
+    const increment = target / totalSteps;
+    let current = 0;
+
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= target) {
+        setValue(target);
+        clearInterval(timer);
+      } else {
+        setValue(Math.round(current));
+      }
+    }, stepTime);
+
+    return () => clearInterval(timer);
+  }, [target]);
+
+  return <strong>{value.toLocaleString()}{suffix}</strong>;
+};
+
+const LandingPage = () => {
+  const navigate = useNavigate();
+  const [impact, setImpact] = useState(null);
+  const [recent, setRecent] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
       try {
-        const response = await api.get('/issues/stats');
-        setStats(response.data);
-      } catch (err) {
-        console.error('Failed to fetch stats:', err);
-      } finally {
-        setLoading(false);
+        const response = await api.get('/public/impact');
+        setImpact(response.data);
+        setRecent(response.data?.recentIssues || []);
+      } catch (error) {
+        console.error('Failed to load public impact:', error);
       }
     };
 
-    const fetchRecentIssues = async () => {
-      try {
-        const response = await api.get('/issues/recent?limit=5');
-        setRecentIssues(response.data);
-      } catch (err) {
-        console.error('Failed to fetch recent issues:', err);
-      } finally {
-        setFeedLoading(false);
-      }
-    };
-
-    const fetchActiveAlerts = async () => {
-      try {
-        const response = await api.get('/alerts/active');
-        console.log('Fetched alerts:', response.data);
-        setAlerts(response.data);
-      } catch (err) {
-        console.error('Failed to fetch alerts:', err);
-      }
-    };
-
-    fetchStats();
-    fetchRecentIssues();
-    fetchActiveAlerts();
-    
-    // Refresh recent issues every 30 seconds
-    const interval = setInterval(fetchRecentIssues, 30000);
-    return () => clearInterval(interval);
+    load();
   }, []);
 
-  const handleCloseAlert = (alertId) => {
-    setClosedAlerts((prev) => [...prev, alertId]);
-  };
+  const stats = useMemo(() => ([
+    { label: 'Issues resolved', value: impact?.resolvedTotal || 0 },
+    { label: 'Active NGOs', value: impact?.ngosActive || 0 },
+    { label: 'Cities covered', value: 48 },
+    { label: 'Resolution rate', value: impact?.resolutionRate || 0, suffix: '%' },
+  ]), [impact]);
 
-  const getAlertIcon = (type) => {
-    switch (type) {
-      case 'urgent':
-        return <AlertTriangle size={18} />;
-      case 'warning':
-        return <AlertCircle size={18} />;
-      default:
-        return <Info size={18} />;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed':
-        return '#10b981';
-      case 'in_review':
-        return '#f59e0b';
-      case 'pending':
-        return '#ef4444';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const formatTimeAgo = (dateString) => {
-    const now = new Date();
-    const then = new Date(dateString);
-    const seconds = Math.floor((now - then) / 1000);
-    
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
-  };
-
-  const features = [
+  const issuePillars = [
     {
-      icon: <MessageSquare size={32} />,
-      title: 'Interactive Chat System',
-      description: 'File complaints through an intuitive conversational interface that guides you step-by-step.'
+      title: 'Civic issues',
+      copy: 'Roads, water, drainage, sanitation, transport, and other public service needs move into the correct departmental queue.',
+      icon: <Globe2 size={18} />,
     },
     {
-      icon: <Clock size={32} />,
-      title: 'Real-Time Tracking',
-      description: 'Track your complaint status in real-time with department updates and resolution evidence.'
+      title: 'Social issues',
+      copy: 'Sensitive cases reach NGOs and helplines first, with escalation when a response needs public support.',
+      icon: <HeartHandshake size={18} />,
     },
     {
-      icon: <Building2 size={32} />,
-      title: 'Department Coordination',
-      description: 'Complaints automatically routed to the right departments for faster resolution.'
+      title: 'Transparent follow-up',
+      copy: 'Every report keeps its status, timeline, and accountability visible so people know what changed.',
+      icon: <BadgeCheck size={18} />,
     },
-    {
-      icon: <CheckCircle size={32} />,
-      title: 'Transparency',
-      description: 'Complete transparency with photo evidence of resolutions and reopen capability.'
-    }
   ];
 
-  const statsDisplay = [
-    { icon: <Users size={24} />, value: loading ? '...' : `${stats.activeCitizens}+`, label: 'Active Citizens' },
-    { icon: <MessageSquare size={24} />, value: loading ? '...' : `${stats.resolvedIssues}+`, label: 'Issues Resolved' },
-    { icon: <Building2 size={24} />, value: loading ? '...' : `${stats.departments}+`, label: 'Departments' },
-    { icon: <Clock size={24} />, value: '24/7', label: 'Support' }
+  const storyCards = [
+    {
+      title: 'Calm reporting',
+      copy: 'A guided flow helps citizens describe the issue, add location, and share evidence without friction.',
+      image: '/assets/landing/Civic-Engagement.jpg',
+      alt: 'People participating in civic engagement activity',
+    },
+    {
+      title: 'Human follow-up',
+      copy: 'Departments, NGOs, and volunteers stay aligned on one timeline instead of scattered chat threads.',
+      image: '/assets/landing/Youth.png',
+      alt: 'Community youth support network',
+    },
+    {
+      title: 'Accountable movement',
+      copy: 'Public tracking and resolution history make progress easier to trust, verify, and share.',
+      image: '/assets/landing/civic-responsibility.webp',
+      alt: 'Civic responsibility illustration',
+    },
   ];
 
-  const howItWorks = [
-    {
-      step: '1',
-      title: 'Report',
-      description: 'Submit your civic complaint through our easy chat interface or quick form.'
-    },
-    {
-      step: '2',
-      title: 'Track',
-      description: 'Monitor the status of your complaint as it gets forwarded to relevant departments.'
-    },
-    {
-      step: '3',
-      title: 'Resolve',
-      description: 'Receive updates and view resolution evidence when departments fix the issue.'
-    }
-  ];
+  const spotlightIssues = recent.length > 0
+    ? recent.slice(0, 4)
+    : [
+        { _id: 'placeholder-1', title: 'Streetlight outage reported in city center', issueTrack: 'civic', status: 'pending' },
+        { _id: 'placeholder-2', title: 'Women safety support request matched to NGO', issueTrack: 'social', status: 'in_review' },
+        { _id: 'placeholder-3', title: 'Drainage overflow raised before monsoon', issueTrack: 'civic', status: 'assigned' },
+        { _id: 'placeholder-4', title: 'Community food support request routed to volunteers', issueTrack: 'social', status: 'resolved' },
+      ];
+
+  const accessTarget = (path) => {
+    // Always funnel landing actions through login/sign-in first.
+    navigate('/login', { state: { from: path } });
+  };
+
+  const openJagruk = () => {
+    window.dispatchEvent(new CustomEvent('jagruk:open'));
+  };
+
+  const openLoginSelector = () => {
+    navigate('/login');
+  };
 
   return (
-    <div className="landing-page">
-      {/* Alerts Bar */}
-      {alerts.length > 0 && console.log('Rendering alerts:', alerts)}
-      {alerts.filter(alert => !closedAlerts.includes(alert._id)).length > 0 && (
-        <div className="alerts-bar">
-          {alerts
-            .filter(alert => !closedAlerts.includes(alert._id))
-            .map((alert) => (
-              <div key={alert._id} className={`alert-banner alert-banner-${alert.type}`}>
-                <div className="alert-banner-content">
-                  <div className="alert-banner-icon">
-                    {getAlertIcon(alert.type)}
-                  </div>
-                  <div className="alert-banner-text">
-                    <strong>{alert.title}</strong>
-                    <span>{alert.message}</span>
-                  </div>
-                </div>
-                <button 
-                  className="alert-banner-close"
-                  onClick={() => handleCloseAlert(alert._id)}
-                  aria-label="Close alert"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            ))}
-        </div>
-      )}
+    <div className="cv-landing">
+      <header className="cv-landing__header">
+        <button type="button" className="cv-brand" onClick={() => navigate('/')}>
+          <span className="cv-brand__mark">CV</span>
+          <span>
+            CivicVoice
+            <strong>People-first issue resolution</strong>
+          </span>
+        </button>
 
-      {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <div className="hero-text">
-            <h1 className="hero-title slide-up">
-              Raise issues.<br />
-              Track resolutions.<br />
-              <span className="hero-highlight">Shape your city.</span>
-            </h1>
-            <p className="hero-subtitle fade-in">
-              The central hub for CityWorks citizens. Report potholes, sanitation issues, or streetlights in seconds and get real-time updates on your phone.
+        <nav className="cv-header-links" aria-label="Landing sections">
+          <a href="#who-we-are">Who we are</a>
+          <a href="#what-we-do">What we do</a>
+          <a href="#resources">Resources</a>
+        </nav>
+
+        <div className="cv-header-actions">
+          <button type="button" className="ghost" onClick={openJagruk}>Ask Jagruk</button>
+          <button type="button" className="ghost" onClick={openLoginSelector}>Sign in</button>
+          <button type="button" className="solid" onClick={openLoginSelector}>Login</button>
+        </div>
+      </header>
+
+      <main>
+        <section className="cv-hero">
+          <div className="cv-hero__copy">
+            <span className="cv-kicker">CIVIC ENGAGEMENT FOR MODERN CITIES</span>
+            <h1>Report civic and social issues in a calmer, clearer way.</h1>
+            <p>
+              CivicVoice turns public complaints into a simple flow: understand the issue, choose the right track,
+              and keep everyone aligned until it is resolved.
             </p>
-            <div className="hero-buttons fade-in">
-              <button 
-                className="cta-button primary"
-                onClick={() => navigate('/login/citizen')}
-              >
-                Get Started
-                <ArrowRight size={20} />
+
+            <div className="cv-hero__actions">
+              <button type="button" className="primary" onClick={() => accessTarget('/report?type=civic')}>
+                Preview civic issue <ArrowRight size={16} />
               </button>
-              <button 
-                className="cta-button secondary"
-                onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}
-              >
-                Learn More
+              <button type="button" className="secondary" onClick={() => accessTarget('/report?type=social')}>
+                Preview social issue <ArrowRight size={16} />
+              </button>
+              <button type="button" className="secondary" onClick={openJagruk}>
+                Talk to Jagruk <ArrowRight size={16} />
               </button>
             </div>
+
+            <div className="cv-hero__notes">
+              <div>
+                <Sparkles size={16} />
+                <span>Simple reporting</span>
+              </div>
+              <div>
+                <ShieldCheck size={16} />
+                <span>Role-aware routing</span>
+              </div>
+              <div>
+                <LayoutGrid size={16} />
+                <span>One public timeline</span>
+              </div>
+            </div>
           </div>
-          <div className="hero-visual">
-            <div className="live-feed glass fade-scale">
-              <div className="live-feed-header">
-                <div className="live-indicator">
-                  <Activity size={16} className="pulse" />
-                  <span>Live City Feed</span>
+
+          <div className="cv-hero__panel">
+            <div className="cv-hero__image-grid" aria-label="CivicVoice preview visuals">
+              <img src="/assets/landing/OIP.webp" alt="Citizen support and social response" loading="lazy" />
+              <img src="/assets/landing/Hum.jpg" alt="Community members discussing local issues" loading="lazy" />
+              <img src="/assets/landing/Civic-Engagement.jpg" alt="Citizens engaged in city problem solving" loading="lazy" />
+            </div>
+
+            <div className="cv-hero__panel-card">
+              <div>
+                <Clock3 size={18} />
+                <strong>Fast routing</strong>
+              </div>
+              <p>Social issues go to NGO response. Civic issues go to departments. The right people see it first.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="cv-stat-strip" aria-label="Platform impact counters">
+          {stats.map((stat) => (
+            <article key={stat.label} className="cv-stat-card">
+              <AnimatedNumber target={stat.value} suffix={stat.suffix || ''} />
+              <span>{stat.label}</span>
+            </article>
+          ))}
+        </section>
+
+        <section id="who-we-are" className="cv-section">
+          <div className="cv-section__heading">
+            <span>Who we are</span>
+            <h2>Built to make public service feel organized, not exhausting.</h2>
+          </div>
+
+          <div className="cv-pillar-grid">
+            {issuePillars.map((pillar) => (
+              <article key={pillar.title} className="cv-pillar-card">
+                <div className="cv-pillar-card__icon">{pillar.icon}</div>
+                <h3>{pillar.title}</h3>
+                <p>{pillar.copy}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section id="what-we-do" className="cv-section cv-section--split">
+          <article className="cv-feature-card">
+            <div className="cv-feature-card__eyebrow">What we solve</div>
+            <h2>Every issue follows a clear path from report to resolution.</h2>
+            <p>
+              Citizens can open a report, attach context, and know whether the issue is civic or social. Each track
+              lands with the right responders and keeps a visible record of progress.
+            </p>
+            <button type="button" className="inline-link" onClick={() => accessTarget('/report?type=civic')}>
+              Start with a civic report <ChevronRight size={16} />
+            </button>
+          </article>
+
+          <div className="cv-track-grid">
+            <button type="button" className="cv-track-card civic" onClick={() => accessTarget('/report?type=civic')}>
+              <FileText size={20} />
+              <strong>Civic issue</strong>
+              <span>Roads, water, drainage, sanitation, transport, and other public service needs.</span>
+              <ArrowUpRight size={16} />
+            </button>
+
+            <button type="button" className="cv-track-card social" onClick={() => accessTarget('/report?type=social')}>
+              <Users size={20} />
+              <strong>Social issue</strong>
+              <span>Safety, care, support, and vulnerable community cases that need human response.</span>
+              <ArrowUpRight size={16} />
+            </button>
+          </div>
+        </section>
+
+        <section className="cv-section">
+          <div className="cv-section__heading">
+            <span>How it works</span>
+            <h2>A short flow that keeps people informed without extra noise.</h2>
+          </div>
+
+          <div className="cv-steps">
+            <article>
+              <strong>01</strong>
+              <h3>Describe the issue</h3>
+              <p>Add the problem, location, and supporting evidence so the report starts with context.</p>
+            </article>
+            <article>
+              <strong>02</strong>
+              <h3>Route by category</h3>
+              <p>The platform separates civic and social cases and sends them to the right workflow immediately.</p>
+            </article>
+            <article>
+              <strong>03</strong>
+              <h3>Track progress publicly</h3>
+              <p>Status updates stay visible so users can see when the case is reviewed, assigned, or resolved.</p>
+            </article>
+            <article>
+              <strong>04</strong>
+              <h3>Close the loop</h3>
+              <p>Resolution details, follow-up notes, and impact data help build trust over time.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="resources" className="cv-section cv-section--resources">
+          <div className="cv-resources__feed">
+            <div className="cv-section__heading compact">
+              <span>Recent issues</span>
+              <h2>Public signals that show the system moving.</h2>
+            </div>
+
+            <div className="cv-recent-grid">
+              {spotlightIssues.map((item, index) => (
+                <article key={`${item._id}-${index}`} className="cv-recent-card">
+                  <span className={`cv-track-badge ${item.issueTrack === 'social' ? 'social' : 'civic'}`}>
+                    {item.issueTrack || 'issue'}
+                  </span>
+                  <h3>{item.title || item.issueType || 'Issue reported'}</h3>
+                  <p>{item.description || 'A public case recently entered the system.'}</p>
+                  <footer>
+                    <strong>{item.status || 'pending'}</strong>
+                    <button type="button" onClick={() => accessTarget(`/track/${item.publicId || item._id}`)}>
+                      Track
+                    </button>
+                  </footer>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <aside className="cv-resources__side">
+            <div className="cv-resource-panel">
+              <div className="cv-section__heading compact">
+                <span>Resources</span>
+                <h2>Helpful entry points for people and teams.</h2>
+              </div>
+
+              <ul>
+                <li><span>•</span> Guided issue reporting for civic and social cases</li>
+                <li><span>•</span> Public tracking for transparency and follow-up</li>
+                <li><span>•</span> Login-based access for citizen, department, and admin roles</li>
+              </ul>
+
+              <div className="cv-resource-panel__actions">
+                <button type="button" onClick={() => accessTarget('/report?type=civic')}>Start civic report</button>
+                <button type="button" onClick={() => accessTarget('/report?type=social')}>Start social report</button>
+              </div>
+            </div>
+
+            <div className="cv-resource-panel soft">
+              <h3>NGO partners</h3>
+              <div className="cv-partner-list">
+                {['Asha Foundation', 'Bright Steps', 'Sahyog Trust', 'Jan Seva', 'CareBridge', 'Nayi Disha'].map((logo) => (
+                  <span key={logo}>{logo}</span>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section className="cv-section">
+          <div className="cv-cta">
+            <div>
+              <span>Ready when you are</span>
+              <h2>Start with Sign in or Login, then continue to the right role flow.</h2>
+            </div>
+            <div className="cv-cta__actions">
+              <button type="button" className="primary" onClick={openLoginSelector}>Sign in</button>
+              <button type="button" className="secondary" onClick={openLoginSelector}>Login</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="cv-section">
+          <div className="cv-story-grid">
+            {storyCards.map((story) => (
+              <article key={story.title} className="cv-story-card">
+                <img src={story.image} alt={story.alt} loading="lazy" />
+                <div>
+                  <h3>{story.title}</h3>
+                  <p>{story.copy}</p>
                 </div>
-                <span className="feed-subtitle">Recent issues from your community</span>
-              </div>
-              <div className="live-feed-content">
-                {feedLoading ? (
-                  <div className="feed-loading">
-                    <Clock size={20} />
-                    <span>Loading recent issues...</span>
-                  </div>
-                ) : recentIssues.length === 0 ? (
-                  <div className="feed-empty">
-                    <AlertCircle size={20} />
-                    <span>No issues reported yet</span>
-                  </div>
-                ) : (
-                  <div className="feed-items">
-                    {recentIssues.map((issue) => (
-                      <div key={issue._id} className="feed-item hover-float">
-                        <div className="feed-item-icon">
-                          <MapPin size={14} />
-                        </div>
-                        <div className="feed-item-content">
-                          <div className="feed-item-title">{issue.issueType}</div>
-                          <div className="feed-item-location">
-                            <MapPin size={10} />
-                            {issue.location}
-                          </div>
-                        </div>
-                        <div className="feed-item-meta">
-                          <span 
-                            className="feed-item-status" 
-                            style={{ backgroundColor: getStatusColor(issue.status) }}
-                          >
-                            {issue.status === 'in_review' ? 'reviewing' : issue.status}
-                          </span>
-                          <span className="feed-item-time">{formatTimeAgo(issue.createdAt)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+              </article>
+            ))}
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
-      {/* Stats Section */}
-      <section className="stats-section">
-        <div className="stats-container">
-          {statsDisplay.map((stat, idx) => (
-            <div key={idx} className={`stat-card glass hover-float scale-in stagger-${idx + 1}`}>
-              <div className="stat-icon">{stat.icon}</div>
-              <div className="stat-value">{stat.value}</div>
-              <div className="stat-label">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-        <div className="stats-cta">
-          <button 
-            className="dashboard-btn glass"
-            onClick={() => navigate('/dashboard')}
-          >
-            View Full Dashboard
-            <ArrowRight size={18} />
-          </button>
-        </div>
-      </section>
+      <footer className="cv-footer">
+        <div className="cv-footer__top">
+          <div>
+            <strong>CivicVoice</strong>
+            <p>Calm, transparent issue reporting for citizens, departments, and social response teams.</p>
+          </div>
 
-      {/* Features Section */}
-      <section id="features" className="features-section">
-        <div className="section-header fade-in">
-          <h2 className="section-title">Why Choose CivicVoice?</h2>
-          <p className="section-subtitle">
-            Empowering citizens with the tools they need to create positive change
-          </p>
-        </div>
-        <div className="features-grid">
-          {features.map((feature, idx) => (
-            <div key={idx} className={`feature-card glass hover-float fade-scale stagger-${idx + 1}`}>
-              <div className="feature-icon">{feature.icon}</div>
-              <h3 className="feature-title">{feature.title}</h3>
-              <p className="feature-description">{feature.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div>
+            <h4>Explore</h4>
+            <button type="button" onClick={() => accessTarget('/impact')}>Impact dashboard</button>
+            <button type="button" onClick={() => accessTarget('/community')}>Community feed</button>
+            <button type="button" onClick={() => accessTarget('/ngos')}>NGO directory</button>
+          </div>
 
-      {/* How It Works Section */}
-      <section className="how-it-works-section">
-        <div className="section-header fade-in">
-          <h2 className="section-title">How It Works</h2>
-          <p className="section-subtitle">
-            Three simple steps to make your voice heard
-          </p>
-        </div>
-        <div className="steps-container">
-          {howItWorks.map((item, idx) => (
-            <div key={idx} className={`step-card glass hover-float slide-in-left stagger-${idx + 1}`}>
-              <div className="step-number">{item.step}</div>
-              <h3 className="step-title">{item.title}</h3>
-              <p className="step-description">{item.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div>
+            <h4>Get started</h4>
+            <button type="button" onClick={openLoginSelector}>Sign in</button>
+            <button type="button" onClick={openLoginSelector}>Login</button>
+            <button type="button" onClick={() => accessTarget('/report?type=civic')}>Civic issue</button>
+            <button type="button" onClick={() => accessTarget('/report?type=social')}>Social issue</button>
+          </div>
 
-      {/* User Types Section */}
-      <section className="user-types-section">
-        <div className="section-header fade-in">
-          <h2 className="section-title">Who We Serve</h2>
-          <p className="section-subtitle">
-            A platform designed for everyone in the civic ecosystem
-          </p>
-        </div>
-        <div className="user-types-grid">
-          <div className="user-type-card glass hover-float scale-in stagger-1">
-            <div className="user-type-icon">
-              <Heart size={40} />
-            </div>
-            <h3>Citizens</h3>
-            <p>Report issues, track complaints, and see transparent resolutions</p>
-            <button className="user-type-btn" onClick={() => navigate('/login/citizen')}>
-              Report an Issue
-            </button>
-          </div>
-          <div className="user-type-card glass hover-float scale-in stagger-2">
-            <div className="user-type-icon">
-              <Building2 size={40} />
-            </div>
-            <h3>Departments</h3>
-            <p>Receive complaints, update statuses, and upload resolution evidence</p>
-            <button className="user-type-btn" onClick={() => navigate('/login/department')}>
-              Department Login
-            </button>
-          </div>
-          <div className="user-type-card glass hover-float scale-in stagger-3">
-            <div className="user-type-icon">
-              <Shield size={40} />
-            </div>
-            <h3>Administrators</h3>
-            <p>Manage complaints, forward to departments, and oversee the entire system</p>
-            <button className="user-type-btn" onClick={() => navigate('/login/admin')}>
-              Admin Access
-            </button>
+          <div>
+            <h4>Support</h4>
+            <p>Childline 1098</p>
+            <p>Women helpline 181</p>
+            <p>Mental health 9152987821</p>
+            <p>Elder support 14567</p>
           </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="cta-content glass fade-scale">
-          <div className="cta-icon">
-            <Zap size={48} />
-          </div>
-          <h2>Ready to Make a Difference?</h2>
-          <p>Join thousands of citizens making their communities better</p>
-          <button 
-            className="cta-button large"
-            onClick={() => navigate('/login/citizen')}
-          >
-            Get Started Now
-            <ArrowRight size={24} />
-          </button>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="landing-footer">
-        <div className="footer-content">
-          <div className="footer-brand">
-            <h3>CivicVoice</h3>
-            <p>Connecting citizens with their government</p>
-          </div>
-          <div className="footer-links">
-            <div className="footer-column">
-              <h4>Platform</h4>
-              <a href="#features">Features</a>
-              <a href="#" onClick={() => navigate('/login')}>Login</a>
-            </div>
-            <div className="footer-column">
-              <h4>Support</h4>
-              <a href="#">Help Center</a>
-              <a href="#">Contact Us</a>
-            </div>
-            <div className="footer-column">
-              <h4>Legal</h4>
-              <a href="#">Privacy Policy</a>
-              <a href="#">Terms of Service</a>
-            </div>
-          </div>
-        </div>
-        <div className="footer-bottom">
-          <p>&copy; 2025 CivicVoice. All rights reserved.</p>
+        <div className="cv-footer__bottom">
+          <p>© 2026 CivicVoice. Built for people-first civic and social response.</p>
+          <p>Public resolution, safer follow-up, and better accountability in one flow.</p>
         </div>
       </footer>
     </div>

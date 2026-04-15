@@ -13,6 +13,7 @@ const {
   getStats,
   getRecentIssues,
   getDashboardStats,
+  getIssueById,
 } = require('../controllers/issueController');
 const { protect, adminOnly, departmentOnly } = require('../middleware/authMiddleware');
 
@@ -35,5 +36,8 @@ router.patch('/:id/department-update', protect, departmentOnly, addDepartmentUpd
 router.get('/mine', protect, getIssuesForCitizen);
 router.patch('/:id/reopen', protect, reopenIssue);
 router.patch('/:id/rate', protect, rateIssue);
+
+// Keep dynamic route last so it does not shadow static paths like /admin, /department, /mine
+router.get('/:id', getIssueById);
 
 module.exports = router;

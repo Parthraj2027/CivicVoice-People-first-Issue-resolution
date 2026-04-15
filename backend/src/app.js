@@ -8,6 +8,10 @@ const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 const authRoutes = require('./routes/authRoutes');
 const issueRoutes = require('./routes/issueRoutes');
+const socialIssueRoutes = require('./routes/socialIssueRoutes');
+const ngoRoutes = require('./routes/ngoRoutes');
+const publicRoutes = require('./routes/publicRoutes');
+const communityRoutes = require('./routes/communityRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const alertRoutes = require('./routes/alertRoutes');
@@ -26,6 +30,10 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/social-issues', socialIssueRoutes);
+app.use('/api/ngos', ngoRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/community', communityRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/alerts', alertRoutes);
